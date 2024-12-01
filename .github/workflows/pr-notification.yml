@@ -59,19 +59,19 @@ jobs:
           if [[ $PR_TITLE =~ \((.*?)\) ]]; then
             CONTENT_IN_BRACKETS="${BASH_REMATCH[1]}"
             echo "Found content in brackets: $CONTENT_IN_BRACKETS"
-          
+            
             # Split by comma and process each item
             declare -A affected_teams
-          
+            
             IFS=',' read -ra ITEMS <<< "$CONTENT_IN_BRACKETS"
             for item in "${ITEMS[@]}"; do
               # Trim whitespace
               item=$(echo "$item" | xargs)
               echo "Processing item: $item"
-          
+              
               # Convert to uppercase for comparison
               UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
-          
+              
               # Skip if it's a Jira ticket (matches QRND-number format, case insensitive)
               if [[ ! $UPPER_ITEM =~ ^QRND-[0-9]+$ ]]; then
                 # Look up team name from service name
@@ -94,7 +94,7 @@ jobs:
                 break
               fi
             done
-          
+            
             # Create a list of channels for the matrix
             if [ ${#affected_teams[@]} -gt 0 ]; then
               CHANNELS_JSON="["
@@ -124,9 +124,16 @@ jobs:
       matrix:
         channel: ${{ fromJson(needs.extract-pr-data.outputs.channel_list) }}
     steps:
+      - name: Debug workflow state
+        run: |
+          echo "Event action: ${{ github.event.action }}"
+          echo "Is new PR (raw): ${{ github.event.action == 'opened' }}"
+          echo "Is new PR (from output): ${{ needs.extract-pr-data.outputs.is_new_pr }}"
+          echo "Channel: ${{ matrix.channel }}"
+
       - name: Send notification to ${{ matrix.channel }}
         id: slack-notification
-        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ matrix.channel }}
@@ -206,13 +213,13 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
       - name: Store message timestamp
-        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true'
         run: |
           mkdir -p ./artifacts
           echo "${{ steps.slack-notification.outputs.ts }}" > "./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
 
       - name: Upload timestamp artifact
-        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: pr-${{ github.event.pull_request.number }}-timestamps
@@ -220,7 +227,7 @@ jobs:
           retention-days: 90
 
       - name: Download previous timestamp
-        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
         uses: actions/download-artifact@v4
         with:
           name: pr-${{ github.event.pull_request.number }}-timestamps
@@ -229,7 +236,7 @@ jobs:
 
       - name: Get original message timestamp
         id: get-timestamp
-        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
         run: |
           TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
           if [ -f "$TS_FILE" ]; then
@@ -241,7 +248,7 @@ jobs:
           fi
 
       - name: 🔄 Send update message
-        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ matrix.channel }}
@@ -261,3 +268,4 @@ jobs:
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
