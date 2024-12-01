@@ -121,11 +121,72 @@ jobs:
               "text": "New PR Notification",
               "blocks": [
                 {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🔍 New Pull Request",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*PR:* ${{ needs.notify-teams.outputs.pr_title }}\n*Link:* ${{ github.event.pull_request.html_url }}\n*PR Number:* ${{ github.event.pull_request.number }}${{ needs.notify-teams.outputs.jira_ticket != '' && format('\n*Jira Ticket:* <https://quinyx.atlassian.net/browse/{0}|{0}>', needs.notify-teams.outputs.jira_ticket) || '' }}"
+                    "text": "*${{ needs.notify-teams.outputs.pr_title }}*"
                   }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*PR Number:*\n#${{ github.event.pull_request.number }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n<https://github.com/${{ github.event.pull_request.user.login }}|@${{ github.event.pull_request.user.login }}>"
+                    }${{ needs.notify-teams.outputs.jira_ticket != '' && format(',
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>"
+                    }', needs.notify-teams.outputs.jira_ticket) || '' }}
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Pull Request",
+                        "emoji": true
+                      },
+                      "url": "${{ github.event.pull_request.html_url }}",
+                      "style": "primary"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Notification sent by GitHub Actions :robot_face:"
+                    }
+                  ]
                 }
               ]
             }
