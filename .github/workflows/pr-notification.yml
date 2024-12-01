@@ -126,6 +126,7 @@ jobs:
     steps:
       - name: Send notification to ${{ matrix.channel }}
         id: slack-notification
+        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ matrix.channel }}
@@ -204,12 +205,47 @@ jobs:
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
-      - name: Send update message
+      - name: Store message timestamp
+        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
+        run: |
+          mkdir -p ./artifacts
+          echo "${{ steps.slack-notification.outputs.ts }}" > "./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+
+      - name: Upload timestamp artifact
+        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: pr-${{ github.event.pull_request.number }}-timestamps
+          path: ./artifacts/
+          retention-days: 90
+
+      - name: Download previous timestamp
+        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        uses: actions/download-artifact@v3
+        with:
+          name: pr-${{ github.event.pull_request.number }}-timestamps
+          path: ./artifacts/
+        continue-on-error: true
+
+      - name: Get original message timestamp
+        id: get-timestamp
+        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        run: |
+          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+          if [ -f "$TS_FILE" ]; then
+            echo "ts=$(cat $TS_FILE)" >> $GITHUB_OUTPUT
+            echo "Found timestamp: $(cat $TS_FILE)"
+          else
+            echo "No timestamp found for PR #${{ github.event.pull_request.number }} in channel ${{ matrix.channel }}"
+            exit 1
+          fi
+
+      - name: 🔄 Send update message
         if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ matrix.channel }}
-          update-ts: ${{ steps.slack-notification.outputs.ts }}
+          update-ts: ${{ steps.get-timestamp.outputs.ts }}
           payload: |
             {
               "text": "PR Updated: ${{ github.event.action }}",
