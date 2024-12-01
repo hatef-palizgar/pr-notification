@@ -279,60 +279,27 @@ jobs:
             exit 1
           fi
 
-      - name: 🔄 Send update message
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
-        uses: slackapi/slack-github-action@v2.0.0
-        with:
-          method: chat.postMessage
-          token: ${{ secrets.SLACK_BOT_TOKEN }}
-          payload: |
-            {
-              "channel": "#${{ matrix.channel }}",
-              "thread_ts": "${{ steps.read-timestamp.outputs.ts }}",
-              "text": "PR Update: ${{ github.event.pull_request.title }}",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*PR Update:* ${{ github.event.action }}\n\n*Latest Commit:*\n${{ github.event.pull_request.head.sha }}\n${{ github.event.pull_request.head.label }}"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Title:* ${{ github.event.pull_request.title }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Author:* ${{ github.event.pull_request.user.login }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Status:* ${{ github.event.pull_request.state }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Last Updated:* ${{ github.event.pull_request.updated_at }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.event.pull_request.html_url }}|View PR Changes> | <${{ github.event.pull_request.html_url }}/files|View Files Changed>"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      #- name: 🔄 Send update message
+      #  if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
+      #  uses: slackapi/slack-github-action@v2.0.0
+      #  with:
+      #    method: chat.postMessage
+      #    token: ${{ secrets.SLACK_BOT_TOKEN }}
+      #    payload: |
+      #      {
+      #        "channel": "#${{ matrix.channel }}",
+      #        "thread_ts": "${{ steps.read-timestamp.outputs.ts }}",
+      #        "text": "PR Updated: ${{ github.event.action }}",
+      #        "blocks": [
+      #          {
+      #            "type": "section",
+      #            "text": {
+      #              "type": "mrkdwn",
+      #              "text": "*PR Update:* ${{ github.event.action }}\n${{ github.event.pull_request.html_url }}"
+      #            }
+      #          }
+      #        ]
+      #      }
+      #  env:
+      #    SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
