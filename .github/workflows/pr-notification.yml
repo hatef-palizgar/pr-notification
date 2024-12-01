@@ -20,6 +20,7 @@ jobs:
       channel_list: ${{ steps.extract-services.outputs.channel_list }}
       pr_title: ${{ steps.extract-services.outputs.pr_title }}
       jira_ticket: ${{ steps.extract-services.outputs.jira_ticket }}
+      pr_description: ${{ steps.extract-services.outputs.pr_description }}
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
@@ -44,6 +45,7 @@ jobs:
           echo "channel_list=[]" >> $GITHUB_OUTPUT
           echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
           echo "jira_ticket=" >> $GITHUB_OUTPUT
+          echo "pr_description=${{ github.event.pull_request.body || '_No description provided_' }}" >> $GITHUB_OUTPUT
 
           # Extract content between parentheses
           if [[ $PR_TITLE =~ \((.*?)\) ]]; then
@@ -163,6 +165,15 @@ jobs:
                     {
                       "type": "mrkdwn",
                       "text": "${{ needs.extract-pr-data.outputs.jira_ticket != '' && format('*:bookmark: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.extract-pr-data.outputs.jira_ticket) || ' ' }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*:memo: Description:*\n${{ needs.extract-pr-data.outputs.pr_description }}"
                     }
                   ]
                 },
