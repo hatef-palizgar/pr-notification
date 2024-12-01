@@ -69,30 +69,42 @@ jobs:
               fi
             done
 
-            # Create a JSON array of affected teams
-            TEAMS_JSON="["
+            # Output each team on a separate line
+            for channel in "${!affected_teams[@]}"; do
+              echo "channel_$channel=$channel" >> $GITHUB_OUTPUT
+            done
+
+            # Set other outputs
+            echo "jira_ticket=$JIRA_TICKET" >> $GITHUB_OUTPUT
+            echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+            
+            # Create a list of channels for the matrix
+            CHANNELS_JSON="["
             first=true
             for channel in "${!affected_teams[@]}"; do
               if [ "$first" = true ]; then
                 first=false
               else
-                TEAMS_JSON+=","
+                CHANNELS_JSON+=","
               fi
-              TEAMS_JSON+="\"$channel\""
+              CHANNELS_JSON+="\"$channel\""
             done
-            TEAMS_JSON+="]"
-
-            # Set output variables
-            echo "teams=$TEAMS_JSON" >> $GITHUB_OUTPUT
-            echo "jira_ticket=$JIRA_TICKET" >> $GITHUB_OUTPUT
-            echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+            CHANNELS_JSON+="]"
+            echo "channel_list=$CHANNELS_JSON" >> $GITHUB_OUTPUT
           fi
 
-      - name: Send notifications to teams
+  send-notifications:
+    needs: notify-teams
+    if: ${{ needs.notify-teams.outputs.channel_list != '[]' && needs.notify-teams.outputs.channel_list != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        channel: ${{ fromJson(needs.notify-teams.outputs.channel_list) }}
+    steps:
+      - name: Send notification to ${{ matrix.channel }}
         uses: slackapi/slack-github-action@v1.24.0
-        if: ${{ steps.extract-services.outputs.teams != '[]' }}
         with:
-          channel-id: ${{ fromJson(steps.extract-services.outputs.teams) }}
+          channel-id: ${{ matrix.channel }}
           payload: |
             {
               "text": "New PR Notification",
@@ -101,10 +113,11 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*PR:* ${{ steps.extract-services.outputs.pr_title }}\n*Link:* ${{ github.event.pull_request.html_url }}\n*PR Number:* ${{ github.event.pull_request.number }}${{ steps.extract-services.outputs.jira_ticket != '' && format('\n*Jira Ticket:* {0}', steps.extract-services.outputs.jira_ticket) || '' }}"
+                    "text": "*PR:* ${{ needs.notify-teams.outputs.pr_title }}\n*Link:* ${{ github.event.pull_request.html_url }}\n*PR Number:* ${{ github.event.pull_request.number }}${{ needs.notify-teams.outputs.jira_ticket != '' && format('\n*Jira Ticket:* {0}', needs.notify-teams.outputs.jira_ticket) || '' }}"
                   }
                 }
               ]
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
