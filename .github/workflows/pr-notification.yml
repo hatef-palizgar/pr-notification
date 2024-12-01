@@ -160,27 +160,9 @@ jobs:
           search_artifacts: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check if timestamp exists
-        id: check-timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
-        run: |
-          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
-          if [ -f "$TS_FILE" ] && [ -s "$TS_FILE" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "ts=$(cat $TS_FILE)" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Debug channel info
-        run: |
-          echo "Channel ID for notification: ${{ matrix.channel }}"
-          echo "Channel type: $(echo ${{ matrix.channel }} | jq -r 'type')"
-          echo "Raw channel data: ${{ toJSON(matrix.channel) }}"
-
       - name: Send notification to ${{ matrix.channel }}
         id: slack-notification
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || steps.check-timestamp.outputs.exists != 'true'
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: "${{ matrix.channel }}"
@@ -260,7 +242,7 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
       - name: Store message timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || steps.check-timestamp.outputs.exists != 'true'
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
         run: |
           mkdir -p ./artifacts
           TIMESTAMP="${{ steps.slack-notification.outputs.ts }}"
@@ -268,13 +250,9 @@ jobs:
           echo "Storing timestamp: $TIMESTAMP"
           echo "To file: $TS_FILE"
           echo "$TIMESTAMP" > "$TS_FILE"
-          echo "Stored timestamp file contents:"
-          cat "$TS_FILE"
-          echo "Directory contents before upload:"
-          find . -type f
 
       - name: Upload timestamp artifact
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || steps.check-timestamp.outputs.exists != 'true'
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: pr-${{ github.event.pull_request.number }}-timestamps
@@ -282,12 +260,18 @@ jobs:
           retention-days: 90
           overwrite: true
 
+      - name: Read timestamp
+        id: read-timestamp
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
+        run: |
+          echo "ts=$(cat ./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt)" >> $GITHUB_OUTPUT
+
       - name: 🔄 Send update message
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'true'
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: "${{ matrix.channel }}"
-          update-ts: ${{ steps.check-timestamp.outputs.ts }}
+          update-ts: ${{ steps.read-timestamp.outputs.ts }}
           payload: |
             {
               "text": "PR Updated: ${{ github.event.action }}",
