@@ -15,6 +15,10 @@ on:
 jobs:
   notify-teams:
     runs-on: ubuntu-latest
+    outputs:
+      channel_list: ${{ steps.extract-services.outputs.channel_list }}
+      pr_title: ${{ steps.extract-services.outputs.pr_title }}
+      jira_ticket: ${{ steps.extract-services.outputs.jira_ticket }}
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
@@ -33,10 +37,17 @@ jobs:
 
           # Get PR title
           PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "Processing PR title: $PR_TITLE"
+
+          # Initialize empty channel list as default
+          echo "channel_list=[]" >> $GITHUB_OUTPUT
+          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+          echo "jira_ticket=" >> $GITHUB_OUTPUT
 
           # Extract content between parentheses
           if [[ $PR_TITLE =~ \((.*?)\) ]]; then
             CONTENT_IN_BRACKETS="${BASH_REMATCH[1]}"
+            echo "Found content in brackets: $CONTENT_IN_BRACKETS"
             
             # Split by comma and process each item
             declare -A affected_teams
@@ -45,6 +56,7 @@ jobs:
             for item in "${ITEMS[@]}"; do
               # Trim whitespace
               item=$(echo "$item" | xargs)
+              echo "Processing item: $item"
               
               # Convert to uppercase for comparison
               UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
@@ -54,6 +66,7 @@ jobs:
                 # Look up team name from service name
                 if [[ -n "${service_team_mapping[$item]}" ]]; then
                   affected_teams["${service_team_mapping[$item]}"]=1
+                  echo "Added team for service $item: ${service_team_mapping[$item]}"
                 fi
               fi
             done
@@ -65,38 +78,36 @@ jobs:
               UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
               if [[ $UPPER_ITEM =~ ^QRND-[0-9]+$ ]]; then
                 JIRA_TICKET=$item
+                echo "Found Jira ticket: $JIRA_TICKET"
+                echo "jira_ticket=$JIRA_TICKET" >> $GITHUB_OUTPUT
                 break
               fi
             done
-
-            # Output each team on a separate line
-            for channel in "${!affected_teams[@]}"; do
-              echo "channel_$channel=$channel" >> $GITHUB_OUTPUT
-            done
-
-            # Set other outputs
-            echo "jira_ticket=$JIRA_TICKET" >> $GITHUB_OUTPUT
-            echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
             
             # Create a list of channels for the matrix
-            CHANNELS_JSON="["
-            first=true
-            for channel in "${!affected_teams[@]}"; do
-              if [ "$first" = true ]; then
-                first=false
-              else
-                CHANNELS_JSON+=","
-              fi
-              CHANNELS_JSON+="\"$channel\""
-            done
-            CHANNELS_JSON+="]"
-            echo "channel_list=$CHANNELS_JSON" >> $GITHUB_OUTPUT
+            if [ ${#affected_teams[@]} -gt 0 ]; then
+              CHANNELS_JSON="["
+              first=true
+              for channel in "${!affected_teams[@]}"; do
+                if [ "$first" = true ]; then
+                  first=false
+                else
+                  CHANNELS_JSON+=","
+                fi
+                CHANNELS_JSON+="\"$channel\""
+              done
+              CHANNELS_JSON+="]"
+              echo "Final channel list: $CHANNELS_JSON"
+              echo "channel_list=$CHANNELS_JSON" >> $GITHUB_OUTPUT
+            fi
           fi
 
   send-notifications:
     needs: notify-teams
-    if: ${{ needs.notify-teams.outputs.channel_list != '[]' && needs.notify-teams.outputs.channel_list != '' }}
+    if: ${{ needs.notify-teams.outputs.channel_list != '[]' }}
     runs-on: ubuntu-latest
+    env:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     strategy:
       matrix:
         channel: ${{ fromJson(needs.notify-teams.outputs.channel_list) }}
