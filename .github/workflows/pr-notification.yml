@@ -289,13 +289,40 @@ jobs:
             {
               "channel": "#${{ matrix.channel }}",
               "thread_ts": "${{ steps.read-timestamp.outputs.ts }}",
-              "text": "PR Updated: ${{ github.event.action }}",
+              "text": "PR Update: ${{ github.event.pull_request.title }}",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*PR Update:* ${{ github.event.action }}\n${{ github.event.pull_request.html_url }}"
+                    "text": "*PR Update:* ${{ github.event.action }}\n\n*Changes:*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ toJSON(github.event.changes) }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:* ${{ github.event.pull_request.state }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Last Updated:* ${{ github.event.pull_request.updated_at }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.event.pull_request.html_url }}|View PR Changes>"
                   }
                 }
               ]
