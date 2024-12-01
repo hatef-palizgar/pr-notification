@@ -20,7 +20,6 @@ jobs:
     steps:
       - name: Extract services from PR title
         id: extract-services
-        shell: bash
         run: |
           # Define service-to-team mapping
           declare -A service_team_mapping
