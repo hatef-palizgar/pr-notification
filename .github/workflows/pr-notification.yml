@@ -279,7 +279,7 @@ jobs:
             exit 1
           fi
 
-      - name: 🔄 Send update message
+      - name: Send update message
         if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
         uses: slackapi/slack-github-action@v2.0.0
         with:
@@ -311,4 +311,3 @@ jobs:
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
