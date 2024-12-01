@@ -13,7 +13,7 @@ on:
       ]
 
 jobs:
-  notify-teams:
+  extract-pr-data:
     runs-on: ubuntu-latest
     outputs:
       channel_list: ${{ steps.extract-services.outputs.channel_list }}
@@ -103,14 +103,14 @@ jobs:
           fi
 
   send-notifications:
-    needs: notify-teams
-    if: ${{ needs.notify-teams.outputs.channel_list != '[]' }}
+    needs: extract-pr-data
+    if: ${{ needs.extract-pr-data.outputs.channel_list != '[]' }}
     runs-on: ubuntu-latest
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     strategy:
       matrix:
-        channel: ${{ fromJson(needs.notify-teams.outputs.channel_list) }}
+        channel: ${{ fromJson(needs.extract-pr-data.outputs.channel_list) }}
     steps:
       - name: Send notification to ${{ matrix.channel }}
         uses: slackapi/slack-github-action@v1.24.0
@@ -135,7 +135,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*${{ needs.notify-teams.outputs.pr_title }}*"
+                    "text": "*${{ needs.extract-pr-data.outputs.pr_title }}*"
                   }
                 },
                 {
@@ -160,7 +160,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "${{ needs.notify-teams.outputs.jira_ticket != '' && format('*:bookmark: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.notify-teams.outputs.jira_ticket) || ' ' }}"
+                      "text": "${{ needs.extract-pr-data.outputs.jira_ticket != '' && format('*:bookmark: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.extract-pr-data.outputs.jira_ticket) || ' ' }}"
                     }
                   ]
                 },
