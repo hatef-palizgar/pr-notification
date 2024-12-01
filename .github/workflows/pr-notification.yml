@@ -20,34 +20,10 @@ jobs:
       channel_list: ${{ steps.extract-services.outputs.channel_list }}
       pr_title: ${{ steps.extract-services.outputs.pr_title }}
       jira_ticket: ${{ steps.extract-services.outputs.jira_ticket }}
-      is_new_message: ${{ steps.check-message-type.outputs.is_new_message }}
-      previous_services: ${{ steps.check-message-type.outputs.previous_services }}
       pr_description: ${{ steps.extract-services.outputs.pr_description }}
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
-      - name: Check if new message needed
-        id: check-message-type
-        run: |
-          # Initialize outputs
-          echo "is_new_message=false" >> $GITHUB_OUTPUT
-          echo "previous_services=[]" >> $GITHUB_OUTPUT
-
-          # Check if this is a new PR
-          if [[ "${{ github.event.action }}" == "opened" ]]; then
-            echo "is_new_message=true" >> $GITHUB_OUTPUT
-          fi
-
-          # For edited events, check if services changed
-          if [[ "${{ github.event.action }}" == "edited" ]] && [[ "${{ github.event.changes.title }}" != "" ]]; then
-            OLD_TITLE="${{ github.event.changes.title.from }}"
-            if [[ $OLD_TITLE =~ \((.*?)\) ]]; then
-              OLD_SERVICES="${BASH_REMATCH[1]}"
-              echo "previous_services=[$OLD_SERVICES]" >> $GITHUB_OUTPUT
-              echo "is_new_message=true" >> $GITHUB_OUTPUT
-            fi
-          fi
-
       - name: Extract services from PR title
         id: extract-services
         run: |
@@ -69,7 +45,7 @@ jobs:
           echo "channel_list=[]" >> $GITHUB_OUTPUT
           echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
           echo "jira_ticket=" >> $GITHUB_OUTPUT
-          echo "pr_description=${{ github.event.pull_request.body }}" >> $GITHUB_OUTPUT
+          echo "pr_description=${{ github.event.pull_request.body || '_No description provided_' }}" >> $GITHUB_OUTPUT
 
           # Extract content between parentheses
           if [[ $PR_TITLE =~ \((.*?)\) ]]; then
@@ -140,20 +116,19 @@ jobs:
       matrix:
         channel: ${{ fromJson(needs.extract-pr-data.outputs.channel_list) }}
     steps:
-      - name: Send new message or thread reply
+      - name: Send notification to ${{ matrix.channel }}
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ matrix.channel }}
           payload: |
             {
               "text": "New PR Notification",
-              ${{ needs.extract-pr-data.outputs.is_new_message != 'true' && format('"thread_ts": "{0}",', github.event.pull_request.head.ref) || '' }}
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "${{ needs.extract-pr-data.outputs.is_new_message == 'true' && '🔍 New Pull Request' || '🔄 Pull Request Updated' }}",
+                    "text": "🔍 New Pull Request",
                     "emoji": true
                   }
                 },
@@ -198,7 +173,7 @@ jobs:
                   "fields": [
                     {
                       "type": "mrkdwn",
-                      "text": "*:memo: Description:*\n${{ needs.extract-pr-data.outputs.pr_description || '_No description provided_' }}"
+                      "text": "*:memo: Description:*\n${{ needs.extract-pr-data.outputs.pr_description }}"
                     }
                   ]
                 },
