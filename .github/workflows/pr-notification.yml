@@ -295,7 +295,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*PR Update*"
+                    "text": "*PR Updated*"
                   }
                 },
                 {
