@@ -2,7 +2,15 @@ name: PR Service Change Notifications
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, review_requested, edited]
+    types:
+      [
+        opened,
+        synchronize,
+        reopened,
+        ready_for_review,
+        review_requested,
+        edited,
+      ]
 
 jobs:
   notify-teams:
@@ -10,8 +18,6 @@ jobs:
     env:
       SLACK_WEBHOOK_URL_FOLLOWUP: ${{ secrets.SLACK_WEBHOOK_URL_FOLLOWUP }}
     steps:
-      - name: Check Bash Version
-        run: bash --version
       - name: Extract services from PR title
         id: extract-services
         shell: bash
@@ -28,7 +34,7 @@ jobs:
 
           # Get PR title
           PR_TITLE="${{ github.event.pull_request.title }}"
-          
+
           # Extract content between parentheses
           if [[ $PR_TITLE =~ \((.*?)\) ]]; then
             CONTENT_IN_BRACKETS="${BASH_REMATCH[1]}"
