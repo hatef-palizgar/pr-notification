@@ -1,4 +1,4 @@
-name: PR Service Change Notifications
+name: PR Notifications
 
 on:
   pull_request:
@@ -13,30 +13,52 @@ on:
       ]
 
 jobs:
-  notify-teams:
-    runs-on: self-hosted
+  extract-pr-data:
+    name: 🔍 Extract PR Data & Identify Teams
+    runs-on: ubuntu-latest
+    outputs:
+      channel_list: ${{ steps.extract-services.outputs.channel_list }}
+      pr_title: ${{ steps.extract-services.outputs.pr_title }}
+      jira_ticket: ${{ steps.extract-services.outputs.jira_ticket }}
+      is_new_pr: ${{ github.event.action == 'opened' }}
     env:
-      SLACK_WEBHOOK_URL_FOLLOWUP: ${{ secrets.SLACK_WEBHOOK_URL_FOLLOWUP }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
+      - name: Debug PR information
+        run: |
+          echo "PR Action: ${{ github.event.action }}"
+          echo "Is New PR: ${{ github.event.action == 'opened' }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "PR Author: ${{ github.event.pull_request.user.login }}"
+          echo "PR URL: ${{ github.event.pull_request.html_url }}"
+
       - name: Extract services from PR title
         id: extract-services
         run: |
-          # Define service-to-team mapping
+          # Define service-to-team mapping with channel IDs
           declare -A service_team_mapping
-          # Format: service_team_mapping["service-name"]="team-name"
-          service_team_mapping["meal-break"]="FOLLOWUP"
-          service_team_mapping["overtime-methods"]="FOLLOWUP"
-          service_team_mapping["salaries"]="FOLLOWUP"
-          service_team_mapping["tags"]="FOLLOWUP"
-          service_team_mapping["time-punch"]="FOLLOWUP"
+          # Format: service_team_mapping["service-name"]="channel-name"
+          service_team_mapping["meal-break"]="followup-team"
+          service_team_mapping["overtime-methods"]="followup-team"
+          service_team_mapping["salaries"]="followup-team"
+          service_team_mapping["tags"]="platform-team"
+          service_team_mapping["time-punch"]="followup-team"
           # More teams and services will be added later
 
           # Get PR title
           PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "Processing PR title: $PR_TITLE"
+
+          # Initialize empty channel list as default
+          echo "channel_list=[]" >> $GITHUB_OUTPUT
+          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+          echo "jira_ticket=" >> $GITHUB_OUTPUT
 
           # Extract content between parentheses
           if [[ $PR_TITLE =~ \((.*?)\) ]]; then
             CONTENT_IN_BRACKETS="${BASH_REMATCH[1]}"
+            echo "Found content in brackets: $CONTENT_IN_BRACKETS"
             
             # Split by comma and process each item
             declare -A affected_teams
@@ -45,6 +67,7 @@ jobs:
             for item in "${ITEMS[@]}"; do
               # Trim whitespace
               item=$(echo "$item" | xargs)
+              echo "Processing item: $item"
               
               # Convert to uppercase for comparison
               UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
@@ -54,6 +77,7 @@ jobs:
                 # Look up team name from service name
                 if [[ -n "${service_team_mapping[$item]}" ]]; then
                   affected_teams["${service_team_mapping[$item]}"]=1
+                  echo "Added team for service $item: ${service_team_mapping[$item]}"
                 fi
               fi
             done
@@ -64,31 +88,177 @@ jobs:
               item=$(echo "$item" | xargs)
               UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
               if [[ $UPPER_ITEM =~ ^QRND-[0-9]+$ ]]; then
-                # Use the original case from the PR title
                 JIRA_TICKET=$item
+                echo "Found Jira ticket: $JIRA_TICKET"
+                echo "jira_ticket=$JIRA_TICKET" >> $GITHUB_OUTPUT
                 break
               fi
             done
-
-            # Prepare the notification payload
-            PAYLOAD='{
-              "pr_url": "${{ github.event.pull_request.html_url }}",
-              "pr_number": "${{ github.event.pull_request.number }}",
-              "pr_title": "'"$PR_TITLE"'"
-            }'
-
-            # Send notification to each affected team
-            for team in "${!affected_teams[@]}"; do
-              echo "Sending notification to team: ${team}"
-              
-              # Get the webhook URL from environment variables
-              WEBHOOK_URL="SLACK_WEBHOOK_URL_${team}"
-              if [[ -n "${!WEBHOOK_URL}" ]]; then
-                curl -X POST -H 'Content-type: application/json' \
-                  --data "$PAYLOAD" \
-                  "${!WEBHOOK_URL}"
-              else
-                echo "Warning: No webhook URL found for team ${team}"
-              fi
-            done
+            
+            # Create a list of channels for the matrix
+            if [ ${#affected_teams[@]} -gt 0 ]; then
+              CHANNELS_JSON="["
+              first=true
+              for channel in "${!affected_teams[@]}"; do
+                if [ "$first" = true ]; then
+                  first=false
+                else
+                  CHANNELS_JSON+=","
+                fi
+                CHANNELS_JSON+="\"$channel\""
+              done
+              CHANNELS_JSON+="]"
+              echo "Final channel list: $CHANNELS_JSON"
+              echo "channel_list=$CHANNELS_JSON" >> $GITHUB_OUTPUT
+            fi
           fi
+
+  send-notifications:
+    name: 📢 Send Slack Notifications
+    needs: extract-pr-data
+    if: ${{ needs.extract-pr-data.outputs.channel_list != '[]' }}
+    runs-on: ubuntu-latest
+    env:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+    strategy:
+      matrix:
+        channel: ${{ fromJson(needs.extract-pr-data.outputs.channel_list) }}
+    steps:
+      - name: Send notification to ${{ matrix.channel }}
+        id: slack-notification
+        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ matrix.channel }}
+          payload: |
+            {
+              "text": "New PR Notification",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ needs.extract-pr-data.outputs.is_new_pr && '🔍 New Pull Request' || '🔄 Pull Request Update' }}",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "image",
+                      "image_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                      "alt_text": "github"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*${{ needs.extract-pr-data.outputs.pr_title }}*"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*:1234: PR Number:*\n#${{ github.event.pull_request.number }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*:package: Repository:*\n${{ github.repository }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*:bust_in_silhouette: Author:*\n${{ github.event.pull_request.user.login }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ needs.extract-pr-data.outputs.jira_ticket != '' && format('*:bookmark: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.extract-pr-data.outputs.jira_ticket) || ' ' }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Pull Request",
+                        "emoji": true
+                      },
+                      "url": "${{ github.event.pull_request.html_url }}",
+                      "style": "primary"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Store message timestamp
+        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
+        run: |
+          mkdir -p ./artifacts
+          echo "${{ steps.slack-notification.outputs.ts }}" > "./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+
+      - name: Upload timestamp artifact
+        if: ${{ needs.extract-pr-data.outputs.is_new_pr }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: pr-${{ github.event.pull_request.number }}-timestamps
+          path: ./artifacts/
+          retention-days: 90
+
+      - name: Download previous timestamp
+        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        uses: actions/download-artifact@v3
+        with:
+          name: pr-${{ github.event.pull_request.number }}-timestamps
+          path: ./artifacts/
+        continue-on-error: true
+
+      - name: Get original message timestamp
+        id: get-timestamp
+        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        run: |
+          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+          if [ -f "$TS_FILE" ]; then
+            echo "ts=$(cat $TS_FILE)" >> $GITHUB_OUTPUT
+            echo "Found timestamp: $(cat $TS_FILE)"
+          else
+            echo "No timestamp found for PR #${{ github.event.pull_request.number }} in channel ${{ matrix.channel }}"
+            exit 1
+          fi
+
+      - name: 🔄 Send update message
+        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ matrix.channel }}
+          update-ts: ${{ steps.get-timestamp.outputs.ts }}
+          payload: |
+            {
+              "text": "PR Updated: ${{ github.event.action }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR Update:* ${{ github.event.action }}\n${{ github.event.pull_request.html_url }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
