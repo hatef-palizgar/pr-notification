@@ -14,6 +14,7 @@ on:
 
 jobs:
   extract-pr-data:
+    name: 🔍 Extract PR Data & Identify Teams
     runs-on: ubuntu-latest
     outputs:
       channel_list: ${{ steps.extract-services.outputs.channel_list }}
@@ -103,6 +104,7 @@ jobs:
           fi
 
   send-notifications:
+    name: 📢 Send Slack Notifications
     needs: extract-pr-data
     if: ${{ needs.extract-pr-data.outputs.channel_list != '[]' }}
     runs-on: ubuntu-latest
