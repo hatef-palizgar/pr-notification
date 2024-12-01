@@ -295,15 +295,21 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*PR Update:* ${{ github.event.action }}\n\n*Changes:*"
+                    "text": "*PR Update:* ${{ github.event.action }}\n\n*Latest Commit:*\n${{ github.event.pull_request.head.sha }}\n${{ github.event.pull_request.head.label }}"
                   }
                 },
                 {
                   "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "${{ toJSON(github.event.changes) }}"
-                  }
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Title:* ${{ github.event.pull_request.title }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:* ${{ github.event.pull_request.user.login }}"
+                    }
+                  ]
                 },
                 {
                   "type": "section",
@@ -322,7 +328,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "<${{ github.event.pull_request.html_url }}|View PR Changes>"
+                    "text": "<${{ github.event.pull_request.html_url }}|View PR Changes> | <${{ github.event.pull_request.html_url }}/files|View Files Changed>"
                   }
                 }
               ]
