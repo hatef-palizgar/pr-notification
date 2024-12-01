@@ -217,12 +217,6 @@ jobs:
               ]
             }
 
-      - name: Debug Slack response
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
-        run: |
-          echo "Slack response ts: ${{ steps.slack-notification.outputs.response }}"
-          echo "Full response: ${{ toJSON(steps.slack-notification.outputs) }}"
-
       - name: Store message timestamp
         if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
         run: |
