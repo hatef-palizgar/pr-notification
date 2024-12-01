@@ -242,6 +242,7 @@ jobs:
       - name: Download previous timestamp
         id: download-artifact
         if: needs.extract-pr-data.outputs.is_new_pr != 'true'
+        continue-on-error: true
         uses: dawidd6/action-download-artifact@v2
         with:
           name: pr-${{ github.event.pull_request.number }}-timestamps
@@ -252,35 +253,76 @@ jobs:
           search_artifacts: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Debug downloaded artifact
+      - name: Check if timestamp exists
+        id: check-timestamp
         if: needs.extract-pr-data.outputs.is_new_pr != 'true'
         run: |
-          echo "Artifacts directory contents:"
-          ls -la ./artifacts/
           TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
           if [ -f "$TS_FILE" ]; then
-            echo "Timestamp file contents:"
-            cat "$TS_FILE"
+            echo "exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Timestamp file not found: $TS_FILE"
+            echo "exists=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Send new message if timestamp not found
+        id: new-message
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'false'
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            {
+              "channel": "#${{ matrix.channel }}",
+              "text": "PR Update",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR Updated*"
+                  },
+                  "accessory": {
+                    "type": "button",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "View PR",
+                      "emoji": true
+                    },
+                    "url": "${{ github.event.pull_request.html_url }}"
+                  }
+                }
+              ]
+            }
+
+      - name: Store new message timestamp
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'false' && steps.new-message.outcome == 'success'
+        run: |
+          mkdir -p ./artifacts
+          RESPONSE='${{ steps.new-message.outputs.response }}'
+          TS=$(echo $RESPONSE | jq -r '.ts')
+          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+          echo "$TS" > "$TS_FILE"
+
+      - name: Upload new timestamp
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'false' && steps.new-message.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-${{ github.event.pull_request.number }}-timestamps
+          path: ./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt
+          retention-days: 90
+          overwrite: true
 
       - name: Read timestamp
         id: read-timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'true'
         run: |
           TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
-          if [ -f "$TS_FILE" ]; then
-            TS=$(cat "$TS_FILE")
-            echo "Found timestamp: $TS"
-            echo "ts=$TS" >> $GITHUB_OUTPUT
-          else
-            echo "No timestamp file found"
-            exit 1
-          fi
+          TS=$(cat "$TS_FILE")
+          echo "ts=$TS" >> $GITHUB_OUTPUT
 
       - name: Send update message
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'true'
         uses: slackapi/slack-github-action@v2.0.0
         with:
           method: chat.postMessage
@@ -311,3 +353,4 @@ jobs:
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
