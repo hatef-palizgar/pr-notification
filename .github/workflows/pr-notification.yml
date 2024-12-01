@@ -147,7 +147,7 @@ jobs:
           payload: |
             {
               "text": "New PR Notification",
-              ${{ needs.extract-pr-data.outputs.is_new_message == 'true' && '' || format('thread_ts: "{0}",', github.event.pull_request.head.ref) }}
+              ${{ needs.extract-pr-data.outputs.is_new_message != 'true' && format('"thread_ts": "{0}",', github.event.pull_request.head.ref) || '' }}
               "blocks": [
                 {
                   "type": "header",
