@@ -134,11 +134,18 @@ jobs:
                   "type": "divider"
                 },
                 {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*${{ needs.extract-pr-data.outputs.pr_title }}*"
-                  }
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "image",
+                      "image_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                      "alt_text": "github"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*${{ needs.extract-pr-data.outputs.pr_title }}*"
+                    }
+                  ]
                 },
                 {
                   "type": "section",
