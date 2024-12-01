@@ -124,7 +124,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*PR:* ${{ needs.notify-teams.outputs.pr_title }}\n*Link:* ${{ github.event.pull_request.html_url }}\n*PR Number:* ${{ github.event.pull_request.number }}${{ needs.notify-teams.outputs.jira_ticket != '' && format('\n*Jira Ticket:* {0}', needs.notify-teams.outputs.jira_ticket) || '' }}"
+                    "text": "*PR:* ${{ needs.notify-teams.outputs.pr_title }}\n*Link:* ${{ github.event.pull_request.html_url }}\n*PR Number:* ${{ github.event.pull_request.number }}${{ needs.notify-teams.outputs.jira_ticket != '' && format('\n*Jira Ticket:* <https://quinyx.atlassian.net/browse/{0}|{0}>', needs.notify-teams.outputs.jira_ticket) || '' }}"
                   }
                 }
               ]
