@@ -20,6 +20,7 @@ jobs:
       channel_list: ${{ steps.extract-services.outputs.channel_list }}
       pr_title: ${{ steps.extract-services.outputs.pr_title }}
       jira_ticket: ${{ steps.extract-services.outputs.jira_ticket }}
+      is_new_pr: ${{ github.event.action == 'opened' }}
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
@@ -115,6 +116,7 @@ jobs:
         channel: ${{ fromJson(needs.extract-pr-data.outputs.channel_list) }}
     steps:
       - name: Send notification to ${{ matrix.channel }}
+        id: slack-notification
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ matrix.channel }}
@@ -126,7 +128,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "🔍 New Pull Request",
+                    "text": "${{ needs.extract-pr-data.outputs.is_new_pr && '🔍 New Pull Request' || '🔄 Pull Request Update' }}",
                     "emoji": true
                   }
                 },
@@ -138,8 +140,8 @@ jobs:
                   "elements": [
                     {
                       "type": "image",
-                      "image_url": "https://i.postimg.cc/3xp5MbyM/github-commit.png",
-                      "alt_text": "commit"
+                      "image_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                      "alt_text": "github"
                     },
                     {
                       "type": "mrkdwn",
@@ -187,6 +189,28 @@ jobs:
                       "style": "primary"
                     }
                   ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Send update message
+        if: ${{ !needs.extract-pr-data.outputs.is_new_pr }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ matrix.channel }}
+          update-ts: ${{ steps.slack-notification.outputs.ts }}
+          payload: |
+            {
+              "text": "PR Updated: ${{ github.event.action }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR Update:* ${{ github.event.action }}\n${{ github.event.pull_request.html_url }}"
+                  }
                 }
               ]
             }
