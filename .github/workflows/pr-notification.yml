@@ -135,7 +135,7 @@ jobs:
                   "elements": [
                     {
                       "type": "image",
-                      "image_url": "https://raw.githubusercontent.com/${{ github.repository }}/main/.github/workflows/github-mark.png",
+                      "image_url": "https://github.com/${{ github.repository }}/blob/main/.github/workflows/github-mark.png",
                       "alt_text": "github"
                     }
                   ]
@@ -148,7 +148,7 @@ jobs:
                   "elements": [
                     {
                       "type": "image",
-                      "image_url": "https://raw.githubusercontent.com/${{ github.repository }}/main/.github/workflows/github-commit.png",
+                      "image_url": "https://github.com/${{ github.repository }}/blob/main/.github/workflows/github-commit.png",
                       "alt_text": "commit"
                     },
                     {
