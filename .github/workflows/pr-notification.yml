@@ -126,9 +126,19 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "🔍 New Pull Request",
-                    "emoji": true
+                    "text": "New Pull Request",
+                    "emoji": false
                   }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "image",
+                      "image_url": "https://raw.githubusercontent.com/${{ github.repository }}/main/.github/workflows/github-mark.png",
+                      "alt_text": "github"
+                    }
+                  ]
                 },
                 {
                   "type": "divider"
@@ -138,8 +148,8 @@ jobs:
                   "elements": [
                     {
                       "type": "image",
-                      "image_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-                      "alt_text": "github"
+                      "image_url": "https://raw.githubusercontent.com/${{ github.repository }}/main/.github/workflows/github-commit.png",
+                      "alt_text": "commit"
                     },
                     {
                       "type": "mrkdwn",
