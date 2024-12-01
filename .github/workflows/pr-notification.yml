@@ -16,19 +16,19 @@ jobs:
   notify-teams:
     runs-on: ubuntu-latest
     env:
-      SLACK_WEBHOOK_URL_FOLLOWUP: ${{ secrets.SLACK_WEBHOOK_URL_FOLLOWUP }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
       - name: Extract services from PR title
         id: extract-services
         run: |
-          # Define service-to-team mapping
+          # Define service-to-team mapping with channel IDs
           declare -A service_team_mapping
-          # Format: service_team_mapping["service-name"]="team-name"
-          service_team_mapping["meal-break"]="FOLLOWUP"
-          service_team_mapping["overtime-methods"]="FOLLOWUP"
-          service_team_mapping["salaries"]="FOLLOWUP"
-          service_team_mapping["tags"]="FOLLOWUP"
-          service_team_mapping["time-punch"]="FOLLOWUP"
+          # Format: service_team_mapping["service-name"]="channel-name"
+          service_team_mapping["meal-break"]="followup-team"
+          service_team_mapping["overtime-methods"]="followup-team"
+          service_team_mapping["salaries"]="followup-team"
+          service_team_mapping["tags"]="followup-team"
+          service_team_mapping["time-punch"]="followup-team"
           # More teams and services will be added later
 
           # Get PR title
@@ -64,31 +64,32 @@ jobs:
               item=$(echo "$item" | xargs)
               UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
               if [[ $UPPER_ITEM =~ ^QRND-[0-9]+$ ]]; then
-                # Use the original case from the PR title
                 JIRA_TICKET=$item
                 break
               fi
             done
 
-            # Prepare the notification payload
-            PAYLOAD='{
-              "pr_url": "${{ github.event.pull_request.html_url }}",
-              "pr_number": "${{ github.event.pull_request.number }}",
-              "pr_title": "'"$PR_TITLE"'"
-            }'
-
             # Send notification to each affected team
-            for team in "${!affected_teams[@]}"; do
-              echo "Sending notification to team: ${team}"
+            for channel in "${!affected_teams[@]}"; do
+              echo "Sending notification to channel: ${channel}"
               
-              # Get the webhook URL from environment variables
-              WEBHOOK_URL="SLACK_WEBHOOK_URL_${team}"
-              if [[ -n "${!WEBHOOK_URL}" ]]; then
-                curl -X POST -H 'Content-type: application/json' \
-                  --data "$PAYLOAD" \
-                  "${!WEBHOOK_URL}"
-              else
-                echo "Warning: No webhook URL found for team ${team}"
+              # Prepare the message payload
+              MESSAGE="New PR Notification
+                *PR:* $PR_TITLE
+                *Link:* ${{ github.event.pull_request.html_url }}
+                *PR Number:* ${{ github.event.pull_request.number }}"
+
+              if [[ -n "$JIRA_TICKET" ]]; then
+                MESSAGE="$MESSAGE
+                *Jira Ticket:* $JIRA_TICKET"
               fi
+
+              # Send message using chat.postMessage API
+              curl -X POST \
+                -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+                -H "Content-type: application/json" \
+                -d "{\"channel\":\"${channel}\",\"text\":\"${MESSAGE}\",\"parse\":\"full\"}" \
+                https://slack.com/api/chat.postMessage
             done
           fi
+
