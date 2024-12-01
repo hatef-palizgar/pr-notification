@@ -121,7 +121,7 @@ jobs:
   send-notifications:
     name: 📢 Send Slack Notifications
     needs: extract-pr-data
-    if: ${{ needs.extract-pr-data.outputs.channel_list != '[]' }}
+    if: needs.extract-pr-data.outputs.channel_list != '[]'
     runs-on: ubuntu-latest
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -129,6 +129,9 @@ jobs:
       matrix:
         channel: ${{ fromJson(needs.extract-pr-data.outputs.channel_list) }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Debug workflow state
         run: |
           echo "Event action: ${{ github.event.action }}"
