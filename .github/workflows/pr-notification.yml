@@ -143,11 +143,11 @@ jobs:
                   "fields": [
                     {
                       "type": "mrkdwn",
-                      "text": "*PR Number:*\n#${{ github.event.pull_request.number }}"
+                      "text": "*:1234: PR Number:*\n#${{ github.event.pull_request.number }}"
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*:github: Repository:*\n${{ github.repository }}"
+                      "text": "*:package: Repository:*\n${{ github.repository }}"
                     }
                   ]
                 },
@@ -160,7 +160,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "${{ needs.notify-teams.outputs.jira_ticket != '' && format('*:jira: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.notify-teams.outputs.jira_ticket) || ' ' }}"
+                      "text": "${{ needs.notify-teams.outputs.jira_ticket != '' && format('*:bookmark: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.notify-teams.outputs.jira_ticket) || ' ' }}"
                     }
                   ]
                 },
