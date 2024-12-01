@@ -131,9 +131,30 @@ jobs:
           echo "Is new PR (from output): ${{ needs.extract-pr-data.outputs.is_new_pr }}"
           echo "Channel: ${{ matrix.channel }}"
 
+      - name: Download previous timestamp
+        id: download-artifact
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-${{ github.event.pull_request.number }}-timestamps
+          path: ./artifacts/
+        continue-on-error: true
+
+      - name: Check if timestamp exists
+        id: check-timestamp
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
+        run: |
+          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+          if [ -f "$TS_FILE" ] && [ -s "$TS_FILE" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "ts=$(cat $TS_FILE)" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Send notification to ${{ matrix.channel }}
         id: slack-notification
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true'
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || steps.check-timestamp.outputs.exists != 'true'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ matrix.channel }}
@@ -213,7 +234,7 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
       - name: Store message timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true'
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || steps.check-timestamp.outputs.exists != 'true'
         run: |
           mkdir -p ./artifacts
           TIMESTAMP="${{ steps.slack-notification.outputs.ts }}"
@@ -227,7 +248,7 @@ jobs:
           find . -type f
 
       - name: Upload timestamp artifact
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true'
+        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || steps.check-timestamp.outputs.exists != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: pr-${{ github.event.pull_request.number }}-timestamps
@@ -235,54 +256,12 @@ jobs:
           retention-days: 90
           overwrite: true
 
-      - name: Download previous timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: pr-${{ github.event.pull_request.number }}-timestamps
-          path: ./artifacts/
-        continue-on-error: true
-
-      - name: Debug artifact contents
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
-        run: |
-          mkdir -p ./artifacts
-          echo "Current directory: $(pwd)"
-          echo "Listing artifacts directory:"
-          ls -la ./artifacts/ || echo "No files in artifacts directory"
-          echo "Looking for timestamp file:"
-          find . -type f -name "pr_${{ github.event.pull_request.number }}_*_ts.txt" || echo "No timestamp files found"
-          echo "Full directory structure:"
-          find . -type f
-
-      - name: Get original message timestamp
-        id: get-timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
-        run: |
-          mkdir -p ./artifacts
-          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
-          echo "Looking for timestamp file: $TS_FILE"
-          if [ -f "$TS_FILE" ]; then
-            echo "Found timestamp file"
-            echo "File contents:"
-            cat "$TS_FILE"
-            echo "Setting timestamp:"
-            echo "ts=$(cat $TS_FILE)" >> $GITHUB_OUTPUT
-            echo "Found timestamp: $(cat $TS_FILE)"
-          else
-            echo "File not found: $TS_FILE"
-            echo "Directory contents:"
-            find . -type f
-            echo "No timestamp found for PR #${{ github.event.pull_request.number }} in channel ${{ matrix.channel }}"
-            exit 1
-          fi
-
       - name: 🔄 Send update message
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'true'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ matrix.channel }}
-          update-ts: ${{ steps.get-timestamp.outputs.ts }}
+          update-ts: ${{ steps.check-timestamp.outputs.ts }}
           payload: |
             {
               "text": "PR Updated: ${{ github.event.action }}",
