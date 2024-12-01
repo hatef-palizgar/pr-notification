@@ -165,9 +165,11 @@ jobs:
         if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: "${{ matrix.channel }}"
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             {
+              "channel": "${{ matrix.channel }}",
               "text": "New PR Notification",
               "blocks": [
                 {
@@ -238,8 +240,6 @@ jobs:
                 }
               ]
             }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
       - name: Store message timestamp
         if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
@@ -270,10 +270,12 @@ jobs:
         if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: "${{ matrix.channel }}"
-          update-ts: ${{ steps.read-timestamp.outputs.ts }}
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             {
+              "channel": "${{ matrix.channel }}",
+              "thread_ts": "${{ steps.read-timestamp.outputs.ts }}",
               "text": "PR Updated: ${{ github.event.action }}",
               "blocks": [
                 {
