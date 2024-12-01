@@ -147,7 +147,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*Repository:*\n${{ github.repository }}"
+                      "text": "*:github: Repository:*\n${{ github.repository }}"
                     }
                   ]
                 },
@@ -156,11 +156,11 @@ jobs:
                   "fields": [
                     {
                       "type": "mrkdwn",
-                      "text": "*Author:*\n<https://github.com/${{ github.event.pull_request.user.login }}|@${{ github.event.pull_request.user.login }}>"
+                      "text": "*:bust_in_silhouette: Author:*\n<https://github.com/${{ github.event.pull_request.user.login }}|${{ github.event.pull_request.user.login }}>"
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "${{ needs.notify-teams.outputs.jira_ticket != '' && format('*Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.notify-teams.outputs.jira_ticket) || ' ' }}"
+                      "text": "${{ needs.notify-teams.outputs.jira_ticket != '' && format('*:jira: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.notify-teams.outputs.jira_ticket) || ' ' }}"
                     }
                   ]
                 },
@@ -176,15 +176,6 @@ jobs:
                       },
                       "url": "${{ github.event.pull_request.html_url }}",
                       "style": "primary"
-                    }
-                  ]
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "Notification sent by GitHub Actions :robot_face:"
                     }
                   ]
                 }
