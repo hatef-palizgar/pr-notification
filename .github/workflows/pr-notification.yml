@@ -24,6 +24,15 @@ jobs:
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
+      - name: Debug PR information
+        run: |
+          echo "PR Action: ${{ github.event.action }}"
+          echo "Is New PR: ${{ github.event.action == 'opened' }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "PR Author: ${{ github.event.pull_request.user.login }}"
+          echo "PR URL: ${{ github.event.pull_request.html_url }}"
+
       - name: Extract services from PR title
         id: extract-services
         run: |
