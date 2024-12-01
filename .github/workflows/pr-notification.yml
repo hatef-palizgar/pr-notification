@@ -161,12 +161,18 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Debug channel info
+        run: |
+          echo "Channel ID for notification: ${{ matrix.channel }}"
+          echo "Channel type: $(echo ${{ matrix.channel }} | jq -r 'type')"
+          echo "Raw channel data: ${{ toJSON(matrix.channel) }}"
+
       - name: Send notification to ${{ matrix.channel }}
         id: slack-notification
         if: needs.extract-pr-data.outputs.is_new_pr == 'true' || steps.check-timestamp.outputs.exists != 'true'
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ matrix.channel }}
+          channel-id: "${{ matrix.channel }}"
           payload: |
             {
               "text": "New PR Notification",
@@ -269,7 +275,7 @@ jobs:
         if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'true'
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          channel-id: ${{ matrix.channel }}
+          channel-id: "${{ matrix.channel }}"
           update-ts: ${{ steps.check-timestamp.outputs.ts }}
           payload: |
             {
