@@ -12,6 +12,11 @@ on:
         edited,
       ]
 
+permissions:
+  pull-requests: read
+  actions: write # Required for downloading artifacts
+  contents: read # Required for reading repository content
+
 jobs:
   extract-pr-data:
     name: 🔍 Extract PR Data & Identify Teams
@@ -134,11 +139,15 @@ jobs:
       - name: Download previous timestamp
         id: download-artifact
         if: needs.extract-pr-data.outputs.is_new_pr != 'true'
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v2
         with:
           name: pr-${{ github.event.pull_request.number }}-timestamps
           path: ./artifacts/
-        continue-on-error: true
+          workflow: pr-notification.yml
+          workflow_conclusion: success
+          if_no_artifact_found: warn
+          search_artifacts: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if timestamp exists
         id: check-timestamp
