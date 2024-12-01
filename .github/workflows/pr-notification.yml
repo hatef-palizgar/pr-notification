@@ -1,4 +1,4 @@
-name: PR Service Change Notifications
+name: PR Notifications
 
 on:
   pull_request:
