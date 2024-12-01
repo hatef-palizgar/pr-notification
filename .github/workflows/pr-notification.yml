@@ -6,7 +6,7 @@ on:
 
 jobs:
   notify-teams:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL_FOLLOWUP: ${{ secrets.SLACK_WEBHOOK_URL_FOLLOWUP }}
     steps:
