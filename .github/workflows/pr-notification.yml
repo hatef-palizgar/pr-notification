@@ -296,21 +296,16 @@ jobs:
                   "text": {
                     "type": "mrkdwn",
                     "text": "*PR Updated*"
+                  },
+                  "accessory": {
+                    "type": "button",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "View PR",
+                      "emoji": true
+                    },
+                    "url": "${{ github.event.pull_request.html_url }}"
                   }
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View PR",
-                        "emoji": true
-                      },
-                      "url": "${{ github.event.pull_request.html_url }}"
-                    }
-                  ]
                 }
               ]
             }
