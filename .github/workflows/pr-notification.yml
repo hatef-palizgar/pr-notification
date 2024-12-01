@@ -216,7 +216,15 @@ jobs:
         if: needs.extract-pr-data.outputs.is_new_pr == 'true'
         run: |
           mkdir -p ./artifacts
-          echo "${{ steps.slack-notification.outputs.ts }}" > "./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+          TIMESTAMP="${{ steps.slack-notification.outputs.ts }}"
+          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+          echo "Storing timestamp: $TIMESTAMP"
+          echo "To file: $TS_FILE"
+          echo "$TIMESTAMP" > "$TS_FILE"
+          echo "Stored timestamp file contents:"
+          cat "$TS_FILE"
+          echo "Directory contents:"
+          ls -la ./artifacts/
 
       - name: Upload timestamp artifact
         if: needs.extract-pr-data.outputs.is_new_pr == 'true'
@@ -234,15 +242,32 @@ jobs:
           path: ./artifacts/
         continue-on-error: true
 
+      - name: Debug artifact contents
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Listing artifacts directory:"
+          ls -la ./artifacts/
+          echo "Looking for timestamp file:"
+          find ./artifacts -type f -name "pr_${{ github.event.pull_request.number }}_*_ts.txt"
+
       - name: Get original message timestamp
         id: get-timestamp
         if: needs.extract-pr-data.outputs.is_new_pr != 'true'
         run: |
           TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
+          echo "Looking for timestamp file: $TS_FILE"
           if [ -f "$TS_FILE" ]; then
+            echo "Found timestamp file"
+            echo "File contents:"
+            cat "$TS_FILE"
+            echo "Setting timestamp:"
             echo "ts=$(cat $TS_FILE)" >> $GITHUB_OUTPUT
             echo "Found timestamp: $(cat $TS_FILE)"
           else
+            echo "File not found: $TS_FILE"
+            echo "Directory contents:"
+            ls -la ./artifacts/
             echo "No timestamp found for PR #${{ github.event.pull_request.number }} in channel ${{ matrix.channel }}"
             exit 1
           fi
