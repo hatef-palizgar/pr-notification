@@ -32,7 +32,7 @@ jobs:
           service_team_mapping["meal-break"]="followup-team"
           service_team_mapping["overtime-methods"]="followup-team"
           service_team_mapping["salaries"]="followup-team"
-          service_team_mapping["tags"]="followup-team"
+          service_team_mapping["tags"]="platform-team"
           service_team_mapping["time-punch"]="followup-team"
           # More teams and services will be added later
 
@@ -185,4 +185,3 @@ jobs:
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
