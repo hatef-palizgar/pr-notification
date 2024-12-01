@@ -86,6 +86,7 @@ jobs:
             echo "teams=$TEAMS_JSON" >> $GITHUB_OUTPUT
             echo "jira_ticket=$JIRA_TICKET" >> $GITHUB_OUTPUT
             echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+          fi
 
       - name: Send notifications to teams
         uses: slackapi/slack-github-action@v1.24.0
