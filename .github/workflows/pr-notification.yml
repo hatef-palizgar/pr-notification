@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   extract-pr-data:
-    name: 🔍 Extract PR Data & Identify Teams
+    name: 🔍 Extract PR Data & Identify channels
     runs-on: ubuntu-latest
     outputs:
       channel_list: ${{ steps.extract-services.outputs.channel_list }}
@@ -41,14 +41,14 @@ jobs:
       - name: Extract services from PR title
         id: extract-services
         run: |
-          # Define service-to-team mapping with channel IDs
-          declare -A service_team_mapping
-          # Format: service_team_mapping["service-name"]="team-name"
-          service_team_mapping["meal-break"]="followup-team"
-          service_team_mapping["overtime-methods"]="followup-team"
-          service_team_mapping["salaries"]="followup-team"
-          service_team_mapping["tags"]="platform-team"
-          service_team_mapping["time-punch"]="followup-team"
+          # Define service-to-channel mapping with channel names
+          declare -A service_channel_mapping
+          # Format: service_channel_mapping["service_name"]="channel_name"
+          service_channel_mapping["meal-break"]="followup-pr-notifications"
+          service_channel_mapping["overtime-methods"]="followup-pr-notifications"
+          service_channel_mapping["salaries"]="followup-pr-notifications"
+          service_channel_mapping["tags"]="followup-pr-notifications"
+          service_channel_mapping["time-punch"]="followup-pr-notifications"
 
           # Get PR title
           PR_TITLE="${{ github.event.pull_request.title }}"
@@ -65,7 +65,7 @@ jobs:
             echo "Found content in brackets: $CONTENT_IN_BRACKETS"
             
             # Split by comma and process each item
-            declare -A affected_teams
+            declare -A target_channels
             
             IFS=',' read -ra ITEMS <<< "$CONTENT_IN_BRACKETS"
             for item in "${ITEMS[@]}"; do
@@ -78,11 +78,11 @@ jobs:
               
               # Skip if it's a Jira ticket (matches QRND-number format, case insensitive)
               if [[ ! $UPPER_ITEM =~ ^QRND-[0-9]+$ ]]; then
-                # Look up team name from service name
-                if [[ -n "${service_team_mapping[$item]}" ]]; then
-                  team_name="${service_team_mapping[$item]}"
-                  affected_teams["$team_name"]=1
-                  echo "Added team for service $item: $team_name"
+                # Look up channel name from service name
+                if [[ -n "${service_channel_mapping[$item]}" ]]; then
+                  channel_name="${service_channel_mapping[$item]}"
+                  target_channels["$channel_name"]=1
+                  echo "Added channel for service $item: $channel_name"
                 fi
               fi
             done
@@ -101,16 +101,16 @@ jobs:
             done
             
             # Create a list of channels for the matrix
-            if [ ${#affected_teams[@]} -gt 0 ]; then
+            if [ ${#target_channels[@]} -gt 0 ]; then
               CHANNELS_JSON="["
               first=true
-              for team in "${!affected_teams[@]}"; do
+              for channel in "${!target_channels[@]}"; do
                 if [ "$first" = true ]; then
                   first=false
                 else
                   CHANNELS_JSON+=","
                 fi
-                CHANNELS_JSON+="\"$team\""
+                CHANNELS_JSON+="\"$channel\""
               done
               CHANNELS_JSON+="]"
               echo "Final channel list: $CHANNELS_JSON"
