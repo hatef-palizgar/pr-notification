@@ -163,7 +163,7 @@ jobs:
       - name: Send notification to ${{ matrix.channel }}
         id: slack-notification
         if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.0.0
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -268,7 +268,7 @@ jobs:
 
       - name: 🔄 Send update message
         if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.0.0
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
