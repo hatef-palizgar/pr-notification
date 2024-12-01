@@ -139,83 +139,17 @@ jobs:
       - name: Send notification to ${{ matrix.channel }}
         id: slack-notification
         if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: ./.github/actions/slack-notification
         with:
-          method: chat.postMessage
-          token: ${{ secrets.SLACK_BOT_TOKEN }}
-          payload: |
-            {
-              "channel": "#${{ matrix.channel }}",
-              "text": "New PR Notification",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "${{ needs.extract-pr-data.outputs.is_new_pr && '🔍 New Pull Request' || '🔄 Pull Request Update' }}",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "divider"
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "image",
-                      "image_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-                      "alt_text": "github"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*${{ needs.extract-pr-data.outputs.pr_title }}*"
-                    }
-                  ]
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*:1234: PR Number:*\n#${{ github.event.pull_request.number }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*:package: Repository:*\n${{ github.repository }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*:bust_in_silhouette: Author:*\n${{ github.event.pull_request.user.login }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "${{ needs.extract-pr-data.outputs.jira_ticket != '' && format('*:bookmark: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.extract-pr-data.outputs.jira_ticket) || ' ' }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View Pull Request",
-                        "emoji": true
-                      },
-                      "url": "${{ github.event.pull_request.html_url }}",
-                      "style": "primary"
-                    }
-                  ]
-                }
-              ]
-            }
+          slack-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ matrix.channel }}
+          thread-ts: ""
+          pr-title: ${{ github.event.pull_request.title }}
+          pr-url: ${{ github.event.pull_request.html_url }}
+          pr-body: ${{ github.event.pull_request.body }}
+          repository: ${{ github.repository }}
+          author: ${{ github.event.pull_request.user.login }}
+          is-update: "false"
 
       - name: Store message timestamp
         if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
@@ -223,12 +157,8 @@ jobs:
           mkdir -p ./artifacts
           RESPONSE='${{ steps.slack-notification.outputs.response }}'
           TS=$(echo $RESPONSE | jq -r '.ts')
-          echo "Extracted timestamp: $TS"
           TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
-          echo "Writing to file: $TS_FILE"
           echo "$TS" > "$TS_FILE"
-          echo "File contents:"
-          cat "$TS_FILE"
 
       - name: Upload timestamp artifact
         if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
@@ -267,33 +197,17 @@ jobs:
       - name: Send new message if timestamp not found
         id: new-message
         if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'false'
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: ./.github/actions/slack-notification
         with:
-          method: chat.postMessage
-          token: ${{ secrets.SLACK_BOT_TOKEN }}
-          payload: |
-            {
-              "channel": "#${{ matrix.channel }}",
-              "text": "PR Update",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*PR Updated*"
-                  },
-                  "accessory": {
-                    "type": "button",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "View PR",
-                      "emoji": true
-                    },
-                    "url": "${{ github.event.pull_request.html_url }}"
-                  }
-                }
-              ]
-            }
+          slack-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ matrix.channel }}
+          thread-ts: ""
+          pr-title: ${{ github.event.pull_request.title }}
+          pr-url: ${{ github.event.pull_request.html_url }}
+          pr-body: ${{ github.event.pull_request.body }}
+          repository: ${{ github.repository }}
+          author: ${{ github.event.pull_request.user.login }}
+          is-update: "false"
 
       - name: Store new message timestamp
         if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'false' && steps.new-message.outcome == 'success'
