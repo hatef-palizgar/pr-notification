@@ -123,20 +123,16 @@ jobs:
               "text": "New PR Notification",
               "blocks": [
                 {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "New Pull Request",
-                    "emoji": false
-                  }
-                },
-                {
                   "type": "context",
                   "elements": [
                     {
                       "type": "image",
                       "image_url": "https://i.postimg.cc/HLgGT45r/github-mark.png",
                       "alt_text": "github"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*New Pull Request*"
                     }
                   ]
                 },
