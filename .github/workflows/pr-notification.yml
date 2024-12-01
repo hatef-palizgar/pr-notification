@@ -1,22 +1,8 @@
-name: PR Notifications
+name: PR Notification
 
 on:
   pull_request:
-    types:
-      [
-        opened,
-        synchronize,
-        reopened,
-        ready_for_review,
-        review_requested,
-        edited,
-      ]
-
-permissions:
-  pull-requests: read
-  actions: write # Required for downloading artifacts
-  contents: read # Required for reading repository content
-
+    types: [opened]
 jobs:
   extract-pr-data:
     name: 🔍 Extract PR Data & Identify channels
@@ -25,19 +11,9 @@ jobs:
       channel_list: ${{ steps.extract-services.outputs.channel_list }}
       pr_title: ${{ steps.extract-services.outputs.pr_title }}
       jira_ticket: ${{ steps.extract-services.outputs.jira_ticket }}
-      is_new_pr: ${{ github.event.action == 'opened' }}
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
-      - name: Debug PR information
-        run: |
-          echo "PR Action: ${{ github.event.action }}"
-          echo "Is New PR: ${{ github.event.action == 'opened' }}"
-          echo "PR Number: ${{ github.event.pull_request.number }}"
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "PR Author: ${{ github.event.pull_request.user.login }}"
-          echo "PR URL: ${{ github.event.pull_request.html_url }}"
-
       - name: Extract services from PR title
         id: extract-services
         run: |
@@ -52,12 +28,7 @@ jobs:
 
           # Get PR title
           PR_TITLE="${{ github.event.pull_request.title }}"
-          echo "Processing PR title: $PR_TITLE"
-
-          # Initialize empty channel list as default
-          echo "channel_list=[]" >> $GITHUB_OUTPUT
-          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
-          echo "jira_ticket=" >> $GITHUB_OUTPUT
+          echo "PR Title: $PR_TITLE"
 
           # Extract content between parentheses
           if [[ $PR_TITLE =~ \((.*?)\) ]]; then
@@ -71,10 +42,9 @@ jobs:
             for item in "${ITEMS[@]}"; do
               # Trim whitespace
               item=$(echo "$item" | xargs)
-              echo "Processing item: $item"
-              
-              # Convert to uppercase for comparison
+              # Convert to uppercase for case-insensitive comparison
               UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
+              echo "Processing item: $item (uppercase: $UPPER_ITEM)"
               
               # Skip if it's a Jira ticket (matches QRND-number format, case insensitive)
               if [[ ! $UPPER_ITEM =~ ^QRND-[0-9]+$ ]]; then
@@ -118,128 +88,20 @@ jobs:
             fi
           fi
 
-  send-notifications:
+  notify-teams:
     name: 📢 Send Slack Notifications
     needs: extract-pr-data
-    if: needs.extract-pr-data.outputs.channel_list != '[]'
+    if: ${{ needs.extract-pr-data.outputs.channel_list != '[]' }}
     runs-on: ubuntu-latest
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     strategy:
       matrix:
         channel: ${{ fromJson(needs.extract-pr-data.outputs.channel_list) }}
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Debug workflow state
-        run: |
-          echo "Event action: ${{ github.event.action }}"
-          echo "Is new PR (raw): ${{ github.event.action == 'opened' }}"
-          echo "Is new PR (from output): ${{ needs.extract-pr-data.outputs.is_new_pr }}"
-          echo "Channel: ${{ matrix.channel }}"
-
       - name: Send notification to ${{ matrix.channel }}
         id: slack-notification
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
-        uses: ./.github/actions/slack-notification
-        with:
-          slack-token: ${{ secrets.SLACK_BOT_TOKEN }}
-          channel: ${{ matrix.channel }}
-          thread-ts: ""
-          pr-title: ${{ github.event.pull_request.title }}
-          pr-url: ${{ github.event.pull_request.html_url }}
-          pr-body: ${{ github.event.pull_request.body }}
-          repository: ${{ github.repository }}
-          author: ${{ github.event.pull_request.user.login }}
-          is-update: "false"
-
-      - name: Store message timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
-        run: |
-          mkdir -p ./artifacts
-          RESPONSE='${{ steps.slack-notification.outputs.response }}'
-          TS=$(echo $RESPONSE | jq -r '.ts')
-          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
-          echo "$TS" > "$TS_FILE"
-
-      - name: Upload timestamp artifact
-        if: needs.extract-pr-data.outputs.is_new_pr == 'true' || failure() || cancelled()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-${{ github.event.pull_request.number }}-timestamps
-          path: ./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt
-          retention-days: 90
-          overwrite: true
-
-      - name: Download previous timestamp
-        id: download-artifact
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
-        continue-on-error: true
-        uses: dawidd6/action-download-artifact@v2
-        with:
-          name: pr-${{ github.event.pull_request.number }}-timestamps
-          path: ./artifacts/
-          workflow: pr-notification.yml
-          workflow_conclusion: success
-          if_no_artifact_found: warn
-          search_artifacts: true
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check if timestamp exists
-        id: check-timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true'
-        run: |
-          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
-          if [ -f "$TS_FILE" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Send new message if timestamp not found
-        id: new-message
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'false'
-        uses: ./.github/actions/slack-notification
-        with:
-          slack-token: ${{ secrets.SLACK_BOT_TOKEN }}
-          channel: ${{ matrix.channel }}
-          thread-ts: ""
-          pr-title: ${{ github.event.pull_request.title }}
-          pr-url: ${{ github.event.pull_request.html_url }}
-          pr-body: ${{ github.event.pull_request.body }}
-          repository: ${{ github.repository }}
-          author: ${{ github.event.pull_request.user.login }}
-          is-update: "false"
-
-      - name: Store new message timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'false' && steps.new-message.outcome == 'success'
-        run: |
-          mkdir -p ./artifacts
-          RESPONSE='${{ steps.new-message.outputs.response }}'
-          TS=$(echo $RESPONSE | jq -r '.ts')
-          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
-          echo "$TS" > "$TS_FILE"
-
-      - name: Upload new timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'false' && steps.new-message.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-${{ github.event.pull_request.number }}-timestamps
-          path: ./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt
-          retention-days: 90
-          overwrite: true
-
-      - name: Read timestamp
-        id: read-timestamp
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'true'
-        run: |
-          TS_FILE="./artifacts/pr_${{ github.event.pull_request.number }}_${{ matrix.channel }}_ts.txt"
-          TS=$(cat "$TS_FILE")
-          echo "ts=$TS" >> $GITHUB_OUTPUT
-
-      - name: Send update message
-        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && steps.check-timestamp.outputs.exists == 'true'
         uses: slackapi/slack-github-action@v2.0.0
         with:
           method: chat.postMessage
@@ -247,27 +109,74 @@ jobs:
           payload: |
             {
               "channel": "#${{ matrix.channel }}",
-              "thread_ts": "${{ steps.read-timestamp.outputs.ts }}",
-              "text": "PR Update",
+              "text": "New PR Notification",
               "blocks": [
                 {
-                  "type": "section",
+                  "type": "header",
                   "text": {
-                    "type": "mrkdwn",
-                    "text": "*PR Updated*"
-                  },
-                  "accessory": {
-                    "type": "button",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "View PR",
-                      "emoji": true
-                    },
-                    "url": "${{ github.event.pull_request.html_url }}"
+                    "type": "plain_text",
+                    "text": "🔔 New Pull Request",
+                    "emoji": true
                   }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "image",
+                      "image_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                      "alt_text": "github"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*${{ needs.extract-pr-data.outputs.pr_title }}*"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                    "type": "mrkdwn",
+                      "text": "*:1234: PR Number:*\n#${{ github.event.pull_request.number }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*:package: Repository:*\n${{ github.repository }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*:bust_in_silhouette: Author:*\n${{ github.event.pull_request.user.login }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ needs.extract-pr-data.outputs.jira_ticket != '' && format('*:bookmark: Jira Ticket:*\n<https://quinyx.atlassian.net/browse/{0}|{0}>', needs.extract-pr-data.outputs.jira_ticket) || ' ' }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Pull Request",
+                        "emoji": true
+                      },
+                      "url": "${{ github.event.pull_request.html_url }}",
+                      "style": "primary"
+                    }
+                  ]
                 }
               ]
             }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
