@@ -279,27 +279,27 @@ jobs:
             exit 1
           fi
 
-      #- name: 🔄 Send update message
-      #  if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
-      #  uses: slackapi/slack-github-action@v2.0.0
-      #  with:
-      #    method: chat.postMessage
-      #    token: ${{ secrets.SLACK_BOT_TOKEN }}
-      #    payload: |
-      #      {
-      #        "channel": "#${{ matrix.channel }}",
-      #        "thread_ts": "${{ steps.read-timestamp.outputs.ts }}",
-      #        "text": "PR Updated: ${{ github.event.action }}",
-      #        "blocks": [
-      #          {
-      #            "type": "section",
-      #            "text": {
-      #              "type": "mrkdwn",
-      #              "text": "*PR Update:* ${{ github.event.action }}\n${{ github.event.pull_request.html_url }}"
-      #            }
-      #          }
-      #        ]
-      #      }
-      #  env:
-      #    SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      - name: 🔄 Send update message
+        if: needs.extract-pr-data.outputs.is_new_pr != 'true' && success()
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            {
+              "channel": "#${{ matrix.channel }}",
+              "thread_ts": "${{ steps.read-timestamp.outputs.ts }}",
+              "text": "PR Updated: ${{ github.event.action }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR Update:* ${{ github.event.action }}\n${{ github.event.pull_request.html_url }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
