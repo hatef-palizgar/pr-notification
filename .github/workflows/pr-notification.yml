@@ -50,12 +50,6 @@ jobs:
           service_team_mapping["tags"]="platform-team"
           service_team_mapping["time-punch"]="followup-team"
 
-          # Define team to Slack channel ID mapping
-          declare -A team_channel_mapping
-          # Format: team_channel_mapping["team-name"]="slack-channel-id"
-          team_channel_mapping["followup-team"]="C083HGVSETB"
-          team_channel_mapping["platform-team"]="C082QDBEATZ"
-
           # Get PR title
           PR_TITLE="${{ github.event.pull_request.title }}"
           echo "Processing PR title: $PR_TITLE"
@@ -72,7 +66,6 @@ jobs:
             
             # Split by comma and process each item
             declare -A affected_teams
-            declare -A affected_channels
             
             IFS=',' read -ra ITEMS <<< "$CONTENT_IN_BRACKETS"
             for item in "${ITEMS[@]}"; do
@@ -89,11 +82,7 @@ jobs:
                 if [[ -n "${service_team_mapping[$item]}" ]]; then
                   team_name="${service_team_mapping[$item]}"
                   affected_teams["$team_name"]=1
-                  # Look up Slack channel ID from team name
-                  if [[ -n "${team_channel_mapping[$team_name]}" ]]; then
-                    affected_channels["${team_channel_mapping[$team_name]}"]=1
-                    echo "Added channel for team $team_name: ${team_channel_mapping[$team_name]}"
-                  fi
+                  echo "Added team for service $item: $team_name"
                 fi
               fi
             done
@@ -112,16 +101,16 @@ jobs:
             done
             
             # Create a list of channels for the matrix
-            if [ ${#affected_channels[@]} -gt 0 ]; then
+            if [ ${#affected_teams[@]} -gt 0 ]; then
               CHANNELS_JSON="["
               first=true
-              for channel in "${!affected_channels[@]}"; do
+              for team in "${!affected_teams[@]}"; do
                 if [ "$first" = true ]; then
                   first=false
                 else
                   CHANNELS_JSON+=","
                 fi
-                CHANNELS_JSON+="\"$channel\""
+                CHANNELS_JSON+="\"$team\""
               done
               CHANNELS_JSON+="]"
               echo "Final channel list: $CHANNELS_JSON"
@@ -169,7 +158,7 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             {
-              "channel": "${{ matrix.channel }}",
+              "channel": "#${{ matrix.channel }}",
               "text": "New PR Notification",
               "blocks": [
                 {
@@ -274,7 +263,7 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             {
-              "channel": "${{ matrix.channel }}",
+              "channel": "#${{ matrix.channel }}",
               "thread_ts": "${{ steps.read-timestamp.outputs.ts }}",
               "text": "PR Updated: ${{ github.event.action }}",
               "blocks": [
