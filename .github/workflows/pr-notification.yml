@@ -160,7 +160,7 @@ jobs:
                   "fields": [
                     {
                       "type": "mrkdwn",
-                      "text": "*:bust_in_silhouette: Author:*\n<https://github.com/${{ github.event.pull_request.user.login }}|${{ github.event.pull_request.user.login }}>"
+                      "text": "*:bust_in_silhouette: Author:*\n${{ github.event.pull_request.user.login }}"
                     },
                     {
                       "type": "mrkdwn",
