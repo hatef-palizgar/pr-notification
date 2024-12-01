@@ -69,27 +69,41 @@ jobs:
               fi
             done
 
-            # Send notification to each affected team
+            # Create a JSON array of affected teams
+            TEAMS_JSON="["
+            first=true
             for channel in "${!affected_teams[@]}"; do
-              echo "Sending notification to channel: ${channel}"
-              
-              # Prepare the message payload
-              MESSAGE="New PR Notification
-                *PR:* $PR_TITLE
-                *Link:* ${{ github.event.pull_request.html_url }}
-                *PR Number:* ${{ github.event.pull_request.number }}"
-
-              if [[ -n "$JIRA_TICKET" ]]; then
-                MESSAGE="$MESSAGE
-                *Jira Ticket:* $JIRA_TICKET"
+              if [ "$first" = true ]; then
+                first=false
+              else
+                TEAMS_JSON+=","
               fi
-
-              # Send message using chat.postMessage API
-              curl -X POST \
-                -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-                -H "Content-type: application/json" \
-                -d "{\"channel\":\"${channel}\",\"text\":\"${MESSAGE}\",\"parse\":\"full\"}" \
-                https://slack.com/api/chat.postMessage
+              TEAMS_JSON+="\"$channel\""
             done
-          fi
+            TEAMS_JSON+="]"
 
+            # Set output variables
+            echo "teams=$TEAMS_JSON" >> $GITHUB_OUTPUT
+            echo "jira_ticket=$JIRA_TICKET" >> $GITHUB_OUTPUT
+            echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+
+      - name: Send notifications to teams
+        uses: slackapi/slack-github-action@v1.24.0
+        if: ${{ steps.extract-services.outputs.teams != '[]' }}
+        with:
+          channel-id: ${{ fromJson(steps.extract-services.outputs.teams) }}
+          payload: |
+            {
+              "text": "New PR Notification",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR:* ${{ steps.extract-services.outputs.pr_title }}\n*Link:* ${{ github.event.pull_request.html_url }}\n*PR Number:* ${{ github.event.pull_request.number }}${{ steps.extract-services.outputs.jira_ticket != '' && format('\n*Jira Ticket:* {0}', steps.extract-services.outputs.jira_ticket) || '' }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
