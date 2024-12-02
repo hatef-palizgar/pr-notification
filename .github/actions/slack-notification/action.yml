@@ -19,6 +19,7 @@ inputs:
   pr-body:
     description: "Pull request body"
     required: true
+    default: "_No description provided_"
   repository:
     description: "Repository name"
     required: true
@@ -64,15 +65,10 @@ runs:
                   "type": "mrkdwn",
                   "text": "*<${{ inputs.pr-url }}|${{ inputs.pr-title }}>*\n*Repository:* ${{ inputs.repository }}\n*Author:* ${{ inputs.author }}"
                 }
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "${{ inputs.pr-body }}"
-                }
               }
+              ${{ inputs.pr-body != '' && format(',{{"type":"section","text":{{"type":"mrkdwn","text":"{0}"}}}}', inputs.pr-body) || '' }}
             ]
           }
       env:
         SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
+
