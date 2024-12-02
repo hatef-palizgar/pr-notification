@@ -2,7 +2,7 @@ name: PR Notification
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, edited]
 jobs:
   extract-pr-data:
     name: 🔍 Extract PR Data & Identify channels
@@ -182,4 +182,3 @@ jobs:
                 }
               ]
             }
-
