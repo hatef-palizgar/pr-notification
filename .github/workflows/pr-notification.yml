@@ -29,6 +29,7 @@ jobs:
           # Get PR title
           PR_TITLE="${{ github.event.pull_request.title }}"
           echo "PR Title: $PR_TITLE"
+          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
 
           # Extract content between parentheses
           if [[ $PR_TITLE =~ \((.*?)\) ]]; then
