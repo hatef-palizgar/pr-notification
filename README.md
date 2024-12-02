@@ -3,4 +3,3 @@
 # pr-notification-poc
 
 This is a project for testing the PR notification feature in GitHub Actions
--
