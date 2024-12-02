@@ -3,92 +3,28 @@ name: PR Notification
 on:
   pull_request:
     types: [opened, edited]
+
+permissions:
+  pull-requests: read
+
 jobs:
   extract-pr-data:
     name: 🔍 Extract PR Data & Identify channels
     runs-on: ubuntu-latest
     outputs:
-      channel_list: ${{ steps.extract-services.outputs.channel_list }}
-      pr_title: ${{ steps.extract-services.outputs.pr_title }}
-      jira_ticket: ${{ steps.extract-services.outputs.jira_ticket }}
+      channel_list: ${{ steps.extract.outputs.channel_list }}
+      pr_title: ${{ steps.extract.outputs.pr_title }}
+      jira_ticket: ${{ steps.extract.outputs.jira_ticket }}
     env:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
     steps:
-      - name: Extract services from PR title
-        id: extract-services
-        run: |
-          # Define service-to-channel mapping with channel names
-          declare -A service_channel_mapping
-          # Format: service_channel_mapping["service_name"]="channel_name"
-          service_channel_mapping["meal-break"]="followup-pr-notifications"
-          service_channel_mapping["overtime-methods"]="followup-pr-notifications"
-          service_channel_mapping["salaries"]="followup-pr-notifications"
-          service_channel_mapping["tags"]="followup-pr-notifications"
-          service_channel_mapping["time-punch"]="followup-pr-notifications"
-
-          # Get PR title
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          echo "PR Title: $PR_TITLE"
-          echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
-          echo "channel_list=[]" >> $GITHUB_OUTPUT
-
-          # Extract content between parentheses
-          if [[ $PR_TITLE =~ \((.*?)\) ]]; then
-            CONTENT_IN_BRACKETS="${BASH_REMATCH[1]}"
-            echo "Found content in brackets: $CONTENT_IN_BRACKETS"
-            
-            # Split by comma and process each item
-            declare -A target_channels
-            
-            IFS=',' read -ra ITEMS <<< "$CONTENT_IN_BRACKETS"
-            for item in "${ITEMS[@]}"; do
-              # Trim whitespace
-              item=$(echo "$item" | xargs)
-              # Convert to uppercase for case-insensitive comparison
-              UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
-              echo "Processing item: $item (uppercase: $UPPER_ITEM)"
-              
-              # Skip if it's a Jira ticket (matches QRND-number format, case insensitive)
-              if [[ ! $UPPER_ITEM =~ ^QRND-[0-9]+$ ]]; then
-                # Look up channel name from service name
-                if [[ -n "${service_channel_mapping[$item]}" ]]; then
-                  channel_name="${service_channel_mapping[$item]}"
-                  target_channels["$channel_name"]=1
-                  echo "Added channel for service $item: $channel_name"
-                fi
-              fi
-            done
-
-            # Extract Jira ticket if present (case insensitive)
-            JIRA_TICKET=""
-            for item in "${ITEMS[@]}"; do
-              item=$(echo "$item" | xargs)
-              UPPER_ITEM=$(echo "$item" | tr '[:lower:]' '[:upper:]')
-              if [[ $UPPER_ITEM =~ ^QRND-[0-9]+$ ]]; then
-                JIRA_TICKET=$item
-                echo "Found Jira ticket: $JIRA_TICKET"
-                echo "jira_ticket=$JIRA_TICKET" >> $GITHUB_OUTPUT
-                break
-              fi
-            done
-            
-            # Create a list of channels for the matrix if we found any
-            if [ ${#target_channels[@]} -gt 0 ]; then
-              CHANNELS_JSON="["
-              first=true
-              for channel in "${!target_channels[@]}"; do
-                if [ "$first" = true ]; then
-                  first=false
-                else
-                  CHANNELS_JSON+=","
-                fi
-                CHANNELS_JSON+="\"$channel\""
-              done
-              CHANNELS_JSON+="]"
-              echo "Final channel list: $CHANNELS_JSON"
-              echo "channel_list=$CHANNELS_JSON" >> $GITHUB_OUTPUT
-            fi
-          fi
+      - uses: actions/checkout@v4
+      
+      - name: Extract PR data
+        id: extract
+        uses: ./.github/actions/extract-pr-data
+        with:
+          pr_title: ${{ github.event.pull_request.title }}
 
   notify-teams:
     name: 📢 Send Slack Notifications
@@ -100,7 +36,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        channel: ${{ fromJson(needs.extract-pr-data.outputs.channel_list) }}
+        channel: ${{ fromJSON(needs.extract-pr-data.outputs.channel_list) }}
 
     steps:
       - name: Send notification to ${{ matrix.channel }}

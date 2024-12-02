@@ -1,0 +1,17 @@
+{
+  "pull_request": {
+    "number": 123,
+    "user": {
+      "login": "hatef-palizgar"
+    },
+    "title": "feat(time-punch, meal-break, QrND-4568): add new feature",
+    "body": "This pull request introduces a new feature that significantly improves the performance of data processing tasks. Key changes include optimized algorithms and refined data structures.",
+    "html_url": "https://github.com/hatef-palizgar/PR/123",
+    "head": {
+      "ref": "edit-test"
+    },
+    "base": {
+      "ref": "main"
+    }
+  }
+}
