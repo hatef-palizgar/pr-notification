@@ -1,0 +1,79 @@
+name: 'Extract PR Data'
+description: 'Extracts services and channels from PR title'
+inputs:
+  pr_title:
+    description: 'Pull request title'
+    required: true
+outputs:
+  channel_list:
+    description: 'List of channels to notify'
+    value: ${{ steps.extract-services.outputs.channel_list }}
+  pr_title:
+    description: 'PR title'
+    value: ${{ steps.extract-services.outputs.pr_title }}
+  jira_ticket:
+    description: 'Jira ticket number'
+    value: ${{ steps.extract-services.outputs.jira_ticket }}
+runs:
+  using: "composite"
+  steps:
+    - name: Extract services from PR title
+      id: extract-services
+      shell: bash
+      run: |
+        # Read service mapping from JSON file
+        MAPPING_FILE="${{ github.action_path }}/service-mapping.json"
+        PR_TITLE="${{ inputs.pr_title }}"
+        
+        echo "Debug: Processing PR title: $PR_TITLE"
+        
+        # Initialize outputs with default values
+        echo "pr_title=$PR_TITLE" >> "$GITHUB_OUTPUT"
+        echo "channel_list=[]" >> "$GITHUB_OUTPUT"
+        echo "jira_ticket=" >> "$GITHUB_OUTPUT"
+        
+        if [[ $PR_TITLE =~ \((.*?)\) ]]; then
+          CONTENT_IN_BRACKETS="${BASH_REMATCH[1]}"
+          echo "Debug: Found content in brackets: $CONTENT_IN_BRACKETS"
+          
+          # Create a temporary file for intermediate results
+          TEMP_FILE=$(mktemp)
+          echo "[]" > "$TEMP_FILE"
+          
+          # Process each service
+          IFS=',' read -ra SERVICES <<< "$CONTENT_IN_BRACKETS"
+          for service in "${SERVICES[@]}"; do
+            # Trim whitespace only
+            service=$(echo "$service" | xargs)
+            echo "Debug: Processing service: $service"
+            
+            # Check if it's a service (not a Jira ticket) - case insensitive match for QRND
+            if [[ ! $service =~ ^[Qq][Rr][Nn][Dd]-[0-9]+$ ]]; then
+              # Get channel from mapping
+              channel=$(jq -r --arg svc "$service" '.[$svc] // empty' "$MAPPING_FILE")
+              if [ ! -z "$channel" ]; then
+                echo "Debug: Found channel for service $service: $channel"
+                # Add to results if not already present
+                jq -c --arg channel "$channel" '
+                  if any(.[]; . == $channel) then . 
+                  else . + [$channel] 
+                  end' "$TEMP_FILE" > "${TEMP_FILE}.tmp" && mv "${TEMP_FILE}.tmp" "$TEMP_FILE"
+              fi
+            else
+              # Convert Jira ticket to uppercase
+              JIRA_TICKET=$(echo "$service" | tr '[:lower:]' '[:upper:]')
+              echo "Debug: Found Jira ticket: $JIRA_TICKET"
+              echo "jira_ticket=$JIRA_TICKET" >> "$GITHUB_OUTPUT"
+            fi
+          done
+          
+          # Get the final channel list (in compact form)
+          CHANNELS=$(jq -c '.' "$TEMP_FILE")
+          echo "Debug: Final channel list: $CHANNELS"
+          
+          if [ "$CHANNELS" != "[]" ]; then
+            echo "channel_list=$CHANNELS" >> "$GITHUB_OUTPUT"
+          fi
+          
+          rm -f "$TEMP_FILE"
+        fi
