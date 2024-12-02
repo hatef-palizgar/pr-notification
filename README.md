@@ -26,6 +26,22 @@ A GitHub Action that automatically extracts service information from pull reques
 - A Slack Bot Token with appropriate permissions (stored as `SLACK_BOT_TOKEN` in repository secrets)
 - Properly configured Slack channels that match the mapping in `service-mapping.json`
 
+## Repository Visibility Configuration 🔒
+
+### For Private Repositories
+If you're using this action in a private repository, you'll need to:
+1. Create a Personal Access Token (PAT) with `repo` scope:
+   - Go to GitHub.com → Settings → Developer settings → Personal access tokens → Tokens (classic)
+   - Generate a new token with `repo` scope
+   - Copy the token value
+2. Add the token as a repository secret:
+   - Go to your repository → Settings → Secrets and variables → Actions
+   - Create a new secret named `PAT_TOKEN`
+   - Paste your token value
+
+### For Public Repositories
+If your repository is public, no additional configuration is needed. The workflow will work out of the box with the default `GITHUB_TOKEN`.
+
 ## Example PR Title Format 📝
 
 ```
