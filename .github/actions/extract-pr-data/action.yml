@@ -1,9 +1,16 @@
+# ============================================================================
+# Extract PR Data Action
+# Extracts services and channels from PR title for notification purposes
+# ============================================================================
+
 name: 'Extract PR Data'
 description: 'Extracts services and channels from PR title'
+
 inputs:
   pr_title:
     description: 'Pull request title'
     required: true
+
 outputs:
   channel_list:
     description: 'List of channels to notify'
@@ -14,15 +21,22 @@ outputs:
   jira_ticket:
     description: 'Jira ticket number'
     value: ${{ steps.extract-services.outputs.jira_ticket }}
+
 runs:
   using: "composite"
   steps:
+    - name: Install yq
+      shell: bash
+      run: |
+        sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        sudo chmod a+x /usr/local/bin/yq
+
     - name: Extract services from PR title
       id: extract-services
       shell: bash
       run: |
-        # Read service mapping from JSON file
-        MAPPING_FILE="${{ github.action_path }}/service-mapping.json"
+        # Read service mapping from YAML file
+        MAPPING_FILE="${{ github.action_path }}/service-mapping.yaml"
         PR_TITLE="${{ inputs.pr_title }}"
         
         echo "Debug: Processing PR title: $PR_TITLE"
@@ -49,9 +63,9 @@ runs:
             
             # Check if it's a service (not a Jira ticket) - case insensitive match for QRND
             if [[ ! $service =~ ^[Qq][Rr][Nn][Dd]-[0-9]+$ ]]; then
-              # Get channel from mapping
-              channel=$(jq -r --arg svc "$service" '.[$svc] // empty' "$MAPPING_FILE")
-              if [ ! -z "$channel" ]; then
+              # Get channel from mapping using yq
+              channel=$(yq e ".$service" "$MAPPING_FILE")
+              if [ "$channel" != "null" ]; then
                 echo "Debug: Found channel for service $service: $channel"
                 # Add to results if not already present
                 jq -c --arg channel "$channel" '
