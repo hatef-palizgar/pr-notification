@@ -1,3 +1,26 @@
+# This GitHub Action automates the process of notifying relevant Slack channels when a Pull Request is created or modified.
+# It extracts information from PR titles (like service names and Jira ticket numbers) and sends targeted notifications
+# to appropriate Slack channels based on the affected services.
+#
+# Components:
+# 1. Composite Action:
+#    - Located in folder /extract-pr-data
+#    - Handles the logic for extracting service names and Jira tickets from PR titles
+#
+# 2. Service Mapping:
+#    - Defined in /extract-pr-data/service-mapping.yaml
+#    - Maps service names (e.g., 'meal-break', 'overtime-methods') to their corresponding Slack channels
+#    - Makes it easy to maintain and update service-to-channel mappings in one place
+#
+# Key features:
+# - Automatically detects affected services from PR titles
+# - Maps services to their corresponding Slack channels
+# - Sends formatted Slack notifications with PR details
+# - Supports multiple service notifications for cross-cutting changes
+#
+# For detailed documentation, configuration options, and setup instructions, visit:
+# https://github.com/hatef-palizgar/pr-notification-quinyx
+
 name: PR Notification
 
 on:
@@ -5,22 +28,28 @@ on:
     types: [opened, edited]
 
 permissions:
-  pull-requests: read
+  pull-requests: read  # For reading PR title and details
+  contents: read      # For repository checkout operations
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   extract-pr-data:
-    name: 🔍 Extract PR Data & Identify channels
+    name: 🔍 Extract PR Data
     runs-on: ubuntu-latest
+    timeout-minutes: 5  # Prevent hung jobs
     outputs:
       channel_list: ${{ steps.extract.outputs.channel_list }}
       pr_title: ${{ steps.extract.outputs.pr_title }}
       jira_ticket: ${{ steps.extract.outputs.jira_ticket }}
-    env:
-      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.QUINICORN_ACTIONS }}
       
       - name: Extract PR data
         id: extract
@@ -28,17 +57,23 @@ jobs:
         with:
           pr_title: ${{ github.event.pull_request.title }}
 
+      - name: Add job summary
+        run: |
+          echo "### PR Data Extraction Results 📊" >> $GITHUB_STEP_SUMMARY
+          echo "* PR Title: ${{ steps.extract.outputs.pr_title }}" >> $GITHUB_STEP_SUMMARY
+          echo "* Jira Ticket: ${{ steps.extract.outputs.jira_ticket }}" >> $GITHUB_STEP_SUMMARY
+          echo "* Target Channels: ${{ steps.extract.outputs.channel_list }}" >> $GITHUB_STEP_SUMMARY
+
   notify-teams:
-    name: 📢 Send Slack Notifications
+    name: 📢 Notify Teams
     needs: extract-pr-data
     if: ${{ needs.extract-pr-data.outputs.channel_list != '[]' }}
     runs-on: ubuntu-latest
-    env:
-      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+    timeout-minutes: 10
     strategy:
-      max-parallel: 1
       matrix:
         channel: ${{ fromJSON(needs.extract-pr-data.outputs.channel_list) }}
+      fail-fast: false  # Continue with other channels if one fails
 
     steps:
       - name: Send notification to ${{ matrix.channel }}
@@ -120,3 +155,13 @@ jobs:
                 }
               ]
             }
+
+      - name: Handle notification failure
+        if: failure()
+        run: |
+          echo "::error::Failed to send notification to channel #${{ matrix.channel }}"
+          exit 1
+
+      - name: Add to job summary
+        run: |
+          echo "✅ Notification sent to #${{ matrix.channel }}" >> $GITHUB_STEP_SUMMARY

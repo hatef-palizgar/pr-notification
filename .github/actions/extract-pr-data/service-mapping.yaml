@@ -1,0 +1,9 @@
+# This file maps service names to their corresponding notification channels
+# Each entry follows the format: service-name: notification-channel
+
+# Services related to followup team
+meal-break: rnd-followup-pr-notifications
+overtime-methods: rnd-followup-pr-notifications
+salaries: rnd-followup-pr-notifications
+tags: rnd-followup-pr-notifications
+time-punch: rnd-followup-pr-notifications
